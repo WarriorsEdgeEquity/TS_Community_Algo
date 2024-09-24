@@ -39,21 +39,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 
-				Description									    = @"TopStep_Community_Algo";
-				Name										        = "TX";
-				Calculate									      = Calculate.OnEachTick;
+				Description								= @"TopStep_Community_Algo";
+				Name									= "TX";
+				Calculate								= Calculate.OnEachTick;
 				EntriesPerDirection							= 1;
-				EntryHandling								    = EntryHandling.AllEntries;
-				IsExitOnSessionCloseStrategy		= true;
-				ExitOnSessionCloseSeconds				= 30;
+				EntryHandling								= EntryHandling.AllEntries;
+				IsExitOnSessionCloseStrategy						= true;
+				ExitOnSessionCloseSeconds						= 30;
 				IsFillLimitOnTouch							= false;
 				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution							= OrderFillResolution.Standard;
-				Slippage									      = 0;
-				StartBehavior								    = StartBehavior.WaitUntilFlat;
-				TimeInForce									    = TimeInForce.Gtc;
-				TraceOrders									    = false;
-				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
+				Slippage								= 0;
+				StartBehavior								= StartBehavior.WaitUntilFlat;
+				TimeInForce								= TimeInForce.Gtc;
+				TraceOrders								= false;
+				RealtimeErrorHandling							= RealtimeErrorHandling.StopCancelClose;
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 20;
 
@@ -68,3 +68,4 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				ClearOutputWindow(); //Clears Output window every time strategy is enabled
 			}
+   
