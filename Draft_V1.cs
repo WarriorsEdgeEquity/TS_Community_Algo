@@ -68,4 +68,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				ClearOutputWindow(); //Clears Output window every time strategy is enabled
 			}
+
    
+   		protected override void OnBarUpdate()
+		{
+
+  		}
+
+		#region Properties
+
+		#region Trading Variables 
+		[NinjaScriptProperty]
+		[Display(Name = "Use iFVG", Order = 0, GroupName = "FVG Settings")]
+		public bool UseiFVG { get; set; }
+		#endregion
+  
+		#endregion
