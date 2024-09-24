@@ -32,4 +32,5 @@ Your discussions and insights help others to better understand the reasoning beh
 ## If you have any questions or need help, feel free to reach out:
 
 Discord: Join the community at TopStep > Strategies > Algo Trading
+
 GitHub Issues: Open a new issue to report bugs or request features
