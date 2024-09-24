@@ -155,6 +155,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 					Print($"Bearish FVG detected from {Low[2]} to {High[0]} at bar {CurrentBar}");
 				}
 			}
+			// Example class to represent a Fair Value Gap (FVG)
+			public class FVG
+			{
+				public FVGType Type { get; set; }
+				public int StartBar { get; set; }
+				public double StartPrice { get; set; }
+				public double EndPrice { get; set; }
+			}
+
+			// Enum to differentiate between bullish and bearish FVGs
+			public enum FVGType
+			{
+				Bullish,
+				Bearish
+			}
 	        // Example placeholder method for trade condition logic
 	        private bool TradeConditionMet()
 	        {
@@ -240,7 +255,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				bool isLong = false;
 				bool isMarket = false;
-				
+
 				if (TradeDirection == "long")
 				{
 					isLong = true;
