@@ -29,9 +29,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 	public class iFVG : Strategy
 	{
 		
+		// variables for using ATM
 		private string atmStrategyId;
 		private string atmStrategyOrderId;
 		private bool   isAtmStrategyCreated = false;
+		
+		// variables for making sure only 1 order is submitted
+		private bool	inTrade = false;
+		private int		barNumber = -1;
 		
 		// List to store all detected Fair Value Gaps (FVGs)
 		private List<FVG> fvgList = new List<FVG>();
@@ -40,9 +45,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (State == State.SetDefaults)
 			{
-				Description									= @"Enter the description for your new custom Strategy here.";
+				Description									= @"TopStep Discord Community Strategy Build";
 				Name										= "iFVG";
-				Calculate									= Calculate.OnEachTick;
+				Calculate									= Calculate.OnBarClose;
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy				= true;
@@ -58,16 +63,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 20;
 
-				// enable iFVGs
+				// turn on off inverted fvgs
 				UseiFVG							= true;
-
-				// use this variable in functions to set the direction and type
-				TradeDirection					= @"long";
-				TradeType						= @"market";
+				
+				// variables for setting trade direction
+				TradeDirection					= @"long"; 		// short
+				TradeType						= @"market";	// limit
 				TradeLimitPrice					= 0;
 				TradeStopPrice					= 0;
 
-				// set the ATM name in NinjaTrader to this v
+				// your ATM template name needs to match this
 				ATMname							= @"ATMstrategy";
 			}
 			else if (State == State.Configure)
@@ -117,8 +122,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Example placeholder:
 			//highOfDay = High[0]; // Replace with actual logic to calculate high of the day
 			//lowOfDay = Low[0]; // Replace with actual logic to calculate low of the day
+
+			// check for fvgs and add them to a list
 			DetectFVG();
 			
+			// Make sure there is a few bars since last trade
+			if ((barNumber + 1) < CurrentBar && inTrade)
+			{
+				if (PositionAccount.MarketPosition == MarketPosition.Flat)
+				{
+					inTrade = false;
+				}
+			}
 			// 2. Check for conditions to trigger a trade
 			if (TradeConditionMet()) // Placeholder method for your trade condition
 			{
@@ -198,11 +213,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool TradeConditionMet()
         {
             // Add logic to check for trade conditions (e.g., engulfing pattern, price breakout)
-			if ((UseiFVG) && (Position.MarketPosition == MarketPosition.Flat))
+			if (!inTrade)
 			{
-				if (CheckForFVGClosure())
+				if ((UseiFVG))
 				{
-					return true;
+					if (CheckForFVGClosure())
+					{
+						return true;
+					}
 				}
 			}
             // Return true if conditions met, otherwise false
@@ -284,6 +302,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // Make sure there are FVGs in the list before proceeding
 		    if (fvgList.Count == 0)
 		        return false;
+			
+			// Drop the oldest fair value gaps
+			while (fvgList.Count > 2)
+			{
+				fvgList.RemoveAt(0);
+			}
 		
 		    // Loop through all FVGs in the list to check if they are closed
 		    for (int i = 0; i < fvgList.Count; i++)
@@ -302,7 +326,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 						TradeType 		= "market";
 						return true;
 		            }
-		            else if (fvg.Type == FVGType.Bearish && High[0] >= fvg.EndPrice)
+		            else if (fvg.Type == FVGType.Bearish && Close[0] > fvg.StartPrice)
 		            {
 		                fvg.IsClosed = true; // Mark as closed
 		                Print($"Bearish FVG closed at bar {CurrentBar}, EndPrice: {fvg.EndPrice}");
@@ -331,7 +355,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				isMarket = true;
 			}
-
+			
+			// flip the flag for in a trade
+			inTrade = true;
+			barNumber = CurrentBar;
+			
+			// use ATM for handling the target and stop
 			useATM(isLong, isMarket, TradeLimitPrice, TradeStopPrice);
         }
 		#endregion
