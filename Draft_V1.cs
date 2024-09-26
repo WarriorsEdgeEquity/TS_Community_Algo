@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				Description									= @"TopStep Discord Community Strategy Build";
 				Name										= "iFVG";
-				Calculate									= Calculate.OnBarClose;
+				Calculate									= Calculate.OnEachTick;
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy				= true;
