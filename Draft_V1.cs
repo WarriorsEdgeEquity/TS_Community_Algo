@@ -230,6 +230,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 		// ATM logic 
 		private void useATM(bool isLong, bool isMarket, double limitPrice, double stopPrice)
 		{
+
+			// Check if the ATM strategy name is provided and matches the template name
+			if (string.IsNullOrEmpty(ATMname))
+			{
+			    Print("Error: ATM strategy name is empty.");
+			    return;
+			}
+			
+			if (!DoesAtmStrategyTemplateExist(ATMname))
+			{
+			    Print($"Error: ATM strategy template '{ATMname}' does not exist.");
+			    return;
+			}
+     
 			// ATM variables
 			OrderAction action = isLong ? OrderAction.Buy : OrderAction.Sell;
 			OrderType orderType = isMarket ? OrderType.Market : OrderType.Limit;
@@ -243,6 +257,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			atmStrategyId = GetAtmStrategyUniqueId();
   			atmStrategyOrderId = GetAtmStrategyUniqueId();
 
+     			Print($"Using ATM Strategy Template: {ATMname}");
+
   			AtmStrategyCreate(action, orderType, limitPrice, stopPrice, TimeInForce.Day,
       			atmStrategyOrderId, ATMname, atmStrategyId, (atmCallbackErrorCode, atmCallbackId) => {
 
@@ -254,8 +270,14 @@ namespace NinjaTrader.NinjaScript.Strategies
           			{
               			// if no error, set private bool to true to indicate the atm strategy is created
               			isAtmStrategyCreated = true;
-          			}
-      			}
+		                Print("ATM strategy created successfully.");
+			        }
+	   
+			        else
+			        {
+			            Print($"Error creating ATM strategy: {atmCallbackErrorCode}");
+			        }
+          		}
   			});
 
   			if(isAtmStrategyCreated)
