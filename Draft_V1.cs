@@ -383,60 +383,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
-            DrawOpenFVGs();
             return false;
-        }
-
-        // Function to draw an FVG on the chart
-        private void DrawFVGOnChart(FVG fvg, int index)
-        {
-            // Use the index to ensure unique drawing tags for each FVG
-            string tag = $"FVG_{index}";
-
-            // Debugging: Print FVG draw information
-            Print($"Drawing FVG with tag: {tag}, StartPrice: {fvg.StartPrice}, EndPrice: {fvg.EndPrice}");
-
-            // Draw the FVG on the chart as a rectangle
-            Draw.Rectangle(
-                    this,
-                    tag,
-                    false,
-                    fvg.StartBar,
-                    fvg.StartPrice,
-                    CurrentBar,
-                    fvg.EndPrice,
-                    Brushes.Orange,
-                    fvg.Type == FVGType.Bullish ? Brushes.Green : Brushes.Red,
-                    2
-            );
-        }
-
-        // Function to clear previous FVG drawings from the chart
-        private void ClearFVGDrawings()
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                RemoveDrawObject($"FVG_{i}");
-            }
-        }
-
-        // Function to draw open FVGs on the chart
-        private void DrawOpenFVGs()
-        {
-            // Clear all previous drawings before drawing new ones
-            ClearFVGDrawings();
-
-            // Draw the 3 most recent open FVGs on the chart
-            for (int i = fvgList.Count - 1; i >= 0; i--)
-            {
-                FVG fvg = fvgList[i];
-
-                // Only draw FVGs that are still open (not closed)
-                if (!fvg.IsClosed)
-                {
-                    DrawFVGOnChart(fvg, i);
-                }
-            }
         }
 
         // Example method for entering a trade
