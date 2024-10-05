@@ -1,0 +1,7 @@
+*.suo
+*.wsuo
+*.user
+*.vs
+bin/
+obj/
+.vs/
