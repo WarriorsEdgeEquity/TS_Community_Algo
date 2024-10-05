@@ -41,6 +41,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         // List to store all detected Fair Value Gaps (FVGs)
         private List<FVG> fvgList = new List<FVG>();
 
+        // variables for loss limits and profit limits
+        private double DayPnl = 0;
+        private double SessionPnl = 0;
+        private bool LimitHit = false;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -72,8 +77,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradeLimitPrice = 0;
                 TradeStopPrice = 0;
 
+                // Daily Limits
+                DailyLossLimit = 1000;
+                DailyProfitLimit = 4000;
+
+                // Bars Since Last Trade
+                barsSinceTrade = 0;
+
+                // iFVG variables
+                lookBackCount = 3;
+
                 // your ATM template name needs to match this
                 ATMname = @"ATMstrategy";
+                // to use ATM strategies set to true
+                ActivateATM = true;
             }
             else if (State == State.Configure)
             {
@@ -129,8 +146,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DetectFVG();
             }
 
+            TrackPNL();
+
             // Make sure there is a few bars since last trade
-            if ((barNumber + 1) < CurrentBar && inTrade)
+            if ((barNumber + barsSinceTrade) < CurrentBar && inTrade)
             {
                 if (PositionAccount.MarketPosition == MarketPosition.Flat)
                 {
@@ -144,18 +163,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // 3. Implement exit strategies (e.g., stop loss, take profit)
-            //if (Position.MarketPosition == MarketPosition.Long)
-            //{
-            // Placeholder for logic to handle long positions (e.g., exit conditions)
-            //}
-            //else if (Position.MarketPosition == MarketPosition.Short)
-            //{
-            // Placeholder for logic to handle short positions (e.g., exit conditions)
-            //}
+            if (!ActivateATM && (Position.MarketPosition == MarketPosition.Long))
+            {
+                //Placeholder for logic to handle long positions (e.g., exit conditions)
+            }
+            else if (!ActivateATM && (Position.MarketPosition == MarketPosition.Short))
+            {
+                //Placeholder for logic to handle short positions (e.g., exit conditions)
+            }
         }
 
 
         #region Methods
+        // Track Day and Session PNL
+        private void TrackPNL()
+        {
+            Print($" Trade profit/loss = {SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit}");
+            if (Times[0][0].TimeOfDay == new TimeSpan(18, 0, 0))
+            {
+                DayPnl = SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit;
+                SessionPnl = SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit;
+            }
+        }
+
         // Detect FVGs
         private void DetectFVG()
         {
@@ -164,7 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             // Check for Bullish Fair Value Gap
-            if ((High[2] < Low[0]) && (Open[1] < Close[1]))
+            if ((High[2] < Low[0]) && (Open[1] < Close[1]) && (Open[1] <= High[2]) && (Close[1] >= Low[0]))
             {
                 // Create and store a bullish FVG
                 FVG fvg = new FVG
@@ -180,7 +210,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Check for Bearish Fair Value Gap
-            else if ((Low[2] > High[0]) && (Close[1] < Open[1]))
+            else if ((Low[2] > High[0]) && (Close[1] < Open[1]) && (Open[1] >= Low[2]) && (Close[1] <= High[0]))
             {
                 // Create and store a bearish FVG
                 FVG fvg = new FVG
@@ -351,7 +381,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
 
             // Drop the oldest fair value gaps
-            while (fvgList.Count > 3)
+            while (fvgList.Count > lookBackCount)
             {
                 fvgList.RemoveAt(0);
             }
@@ -404,12 +434,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 isMarket = true;
             }
 
+            // use ATM for handling the target and stop
+            if (ActivateATM)
+            {
+                useATM(isLong, isMarket, TradeLimitPrice, TradeStopPrice);
+            }
             // flip the flag for in a trade
             inTrade = true;
             barNumber = CurrentBar;
 
-            // use ATM for handling the target and stop
-            useATM(isLong, isMarket, TradeLimitPrice, TradeStopPrice);
         }
         #endregion
 
@@ -443,6 +476,32 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "ATMname", Order = 6, GroupName = "Parameters")]
         public string ATMname
         { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "lookBackCount", Order = 7, GroupName = "Parameters")]
+        public int lookBackCount
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "ActivateATM", Order = 8, GroupName = "Parameters")]
+        public bool ActivateATM
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "DailyLossLimit", Order = 9, GroupName = "Parameters")]
+        public int DailyLossLimit
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "DailyProfitLimit", Order = 10, GroupName = "Parameters")]
+        public int DailyProfitLimit
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "barsSinceLastTrade", Order = 11, GroupName = "Parameters")]
+        public int barsSinceTrade
+        { get; set; }
+
         #endregion
 
     }
