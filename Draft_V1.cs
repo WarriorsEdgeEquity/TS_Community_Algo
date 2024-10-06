@@ -217,10 +217,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void TrackPNL()
         {
 
-            SessionPnl = DayPnl - TradesAll;
-            if ((TradeNum < 3) && (SessionPnl > (DailyProfitLimit * .42)))
+            // A check to avoid overtrading and to see if you had a great run-up, to stop for the session and wait for the next
+            if ((TradeNum <= 4) && (TradeNum > 0) && (SessionPnl > (DailyProfitLimit * .70)) || ((TradeNum == 1) && SessionPnl >= (DailyProfitLimit * .50)))
             {
-                Print($"PNL better than 40% after {TradeNum} trades");
+                Print($"PNL Lockout better than 70% or 50% after {TradeNum} trades");
                 LimitHit = true;
             }
             if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
@@ -233,54 +233,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print($"New Day & Asia Session");
                 LimitHit = false;
-                DailyProfitLimit = ProfitReset;
                 DayPnl = 0;
                 SessionPnl = 0;
                 TradeNum = 0;
                 BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
             }
-            else if (Times[0][0].TimeOfDay == new TimeSpan(01, 30, 0))
+            else if (Times[0][0].TimeOfDay == new TimeSpan(01, 32, 0))
             {
 
                 Print($"London Session");
                 LimitHit = false;
-                DailyProfitLimit = ProfitReset;
                 TradesAll = DayPnl;
                 SessionPnl = 0;
                 TradeNum = 0;
                 BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
             }
             else if (Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0))
             {
                 Print($"New York AM Session");
                 LimitHit = false;
-                DailyProfitLimit = ProfitReset;
                 TradesAll = DayPnl;
                 SessionPnl = 0;
                 TradeNum = 0;
                 BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
             }
             else if (Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0))
             {
                 Print($"New York PM Session");
                 LimitHit = false;
-                DailyProfitLimit = ProfitReset;
                 TradesAll = DayPnl;
                 SessionPnl = 0;
                 TradeNum = 0;
                 BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
             }
             else if (Times[0][0].TimeOfDay == new TimeSpan(15, 42, 0))
             {
                 Print($"End Of Trading Day {DayPnl}");
                 LimitHit = true;
                 TradeNum = 0;
+                TradesAll = DayPnl;
                 BackBrush = Brushes.Red;
-                DailyProfitLimit = ProfitReset;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
             }
+            SessionPnl = DayPnl - TradesAll;
             Draw.TextFixed(this, @"pnl", Convert.ToString(SessionPnl), TextPosition.TopRight);
             Draw.TextFixed(this, @"numTrades", Convert.ToString(TradeNum), TextPosition.BottomLeft);
-            Print($"{Times[0][0].TimeOfDay} pnl= {DayPnl} stop={DailyLossLimit} profit={DailyProfitLimit}");
         }
 
         // Detect FVGs
@@ -457,6 +473,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // You can change the stop price even when its being managed by the ATM strategy STOP19 is to prevent the STOP1 from being changed
                     // more logic needed here if you want to do fancy things with the stop loss while it is still being managed by ATM strategy
+
                     //if (GetAtmStrategyMarketPosition(atmStrategyId) != MarketPosition.Flat)
                     //	AtmStrategyChangeStopTarget(0, Low[0] - 3 * TickSize, "STOP19", atmStrategyId);
 
@@ -540,6 +557,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             inTrade = true;
             TradeNum += 1;
             barNumber = CurrentBar;
+            Print($"{Times[0][0].TimeOfDay} pnl= {DayPnl} stop={DailyLossLimit} profit={DailyProfitLimit}");
 
         }
         #endregion
