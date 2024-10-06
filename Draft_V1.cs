@@ -42,8 +42,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<FVG> fvgList = new List<FVG>();
 
         // variables for loss limits and profit limits
+        private Account InvAcct = Account.All.FirstOrDefault();
+        private int TradeNum = 0;
         private double DayPnl = 0;
         private double SessionPnl = 0;
+        private double TradesAll = 0;
+        private double ProfitReset = 0;
         private bool LimitHit = false;
 
         protected override void OnStateChange()
@@ -78,11 +82,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradeStopPrice = 0;
 
                 // Daily Limits
-                DailyLossLimit = 1000;
-                DailyProfitLimit = 4000;
+                UsingMicros = false;
+                DailyLossLimit = -1000.0;
+                DailyProfitLimit = 5000.0;
+                limitOffset = -100.0;
+
+                // Scale for micros
+                if (UsingMicros)
+                {
+                    DailyLossLimit = (DailyLossLimit * .10);
+                    DailyProfitLimit = (DailyProfitLimit * .10);
+                }
+                // Decay Profit Target
+                ProfitDecay = true;
+                ProfitReset = DailyProfitLimit;
 
                 // Bars Since Last Trade
                 barsSinceTrade = 0;
+                maxTrades = 6;
 
                 // iFVG variables
                 lookBackCount = 3;
@@ -91,15 +108,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ATMname = @"ATMstrategy";
                 // to use ATM strategies set to true
                 ActivateATM = true;
+
             }
             else if (State == State.Configure)
             {
+                Print($"Starting... {SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit}");
             }
         }
 
         protected override void OnAccountItemUpdate(Cbi.Account account, Cbi.AccountItem accountItem, double value)
         {
-
+            if (accountItem == Cbi.AccountItem.GrossRealizedProfitLoss)
+            {
+                Print($" OnAcctItem = {account} = {value}");
+                DayPnl = value;
+            }
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs connectionStatusUpdate)
@@ -154,10 +177,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (PositionAccount.MarketPosition == MarketPosition.Flat)
                 {
                     inTrade = false;
+
+                    // Profit Target Decay with the number of trades taken
+                    if (ProfitDecay)
+                    {
+                        if ((TradeNum <= maxTrades) && TradeNum > 0)
+                        {
+                            Print($"{TradeNum} less {maxTrades} {DailyProfitLimit} ");
+                            DailyProfitLimit = (DailyProfitLimit + limitOffset);
+                        }
+                        else if (TradeNum > maxTrades)
+                        {
+                            Print($"Trade higher?");
+                            DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 1) * limitOffset);
+                        }
+                    }
                 }
             }
             // 2. Check for conditions to trigger a trade
-            if (TradeConditionMet()) // Placeholder method for your trade condition
+            if (TradeConditionMet() && !LimitHit) // Placeholder method for your trade condition
             {
                 EnterTrade(); // Method to handle trade entry
             }
@@ -178,12 +216,66 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Track Day and Session PNL
         private void TrackPNL()
         {
-            Print($" Trade profit/loss = {SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit}");
-            if (Times[0][0].TimeOfDay == new TimeSpan(18, 0, 0))
+
+            SessionPnl = DayPnl - TradesAll;
+            if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
             {
-                DayPnl = SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit;
-                SessionPnl = SystemPerformance.RealTimeTrades.TradesPerformance.Currency.CumProfit;
+                Print($"Limit Hit {LimitHit} pnl= {SessionPnl} trades={TradeNum}");
+                LimitHit = true;
             }
+
+            if (Times[0][0].TimeOfDay == new TimeSpan(18, 10, 0))
+            {
+                Print($"New Day & Asia Session");
+                LimitHit = false;
+                DailyProfitLimit = ProfitReset;
+                DayPnl = 0;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+            }
+            else if (Times[0][0].TimeOfDay == new TimeSpan(01, 30, 0))
+            {
+
+                Print($"London Session");
+                LimitHit = false;
+                DailyProfitLimit = ProfitReset;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+            }
+            else if (Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0))
+            {
+                Print($"New York AM Session");
+                LimitHit = false;
+                DailyProfitLimit = ProfitReset;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+            }
+            else if (Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0))
+            {
+                Print($"New York PM Session");
+                LimitHit = false;
+                DailyProfitLimit = ProfitReset;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+            }
+            else if (Times[0][0].TimeOfDay == new TimeSpan(15, 42, 0))
+            {
+                Print($"End Of Trading Day {DayPnl}");
+                LimitHit = true;
+                TradeNum = 0;
+                BackBrush = Brushes.Red;
+                DailyProfitLimit = ProfitReset;
+            }
+            Draw.TextFixed(this, @"pnl", Convert.ToString(SessionPnl), TextPosition.TopRight);
+            Draw.TextFixed(this, @"numTrades", Convert.ToString(TradeNum), TextPosition.BottomLeft);
+            Print($"{Times[0][0].TimeOfDay} pnl= {DayPnl} stop={DailyLossLimit} profit={DailyProfitLimit}");
         }
 
         // Detect FVGs
@@ -441,6 +533,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             // flip the flag for in a trade
             inTrade = true;
+            TradeNum += 1;
             barNumber = CurrentBar;
 
         }
@@ -489,16 +582,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Display(Name = "DailyLossLimit", Order = 9, GroupName = "Parameters")]
-        public int DailyLossLimit
+        public double DailyLossLimit
         { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "DailyProfitLimit", Order = 10, GroupName = "Parameters")]
-        public int DailyProfitLimit
+        public double DailyProfitLimit
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "barsSinceLastTrade", Order = 11, GroupName = "Parameters")]
+        [Display(Name = "UsingMicros", Order = 11, GroupName = "Parameters")]
+        public bool UsingMicros
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "ProfitDecay", Order = 12, GroupName = "Parameters")]
+        public bool ProfitDecay
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "limitOffset", Order = 13, GroupName = "Parameters")]
+        public double limitOffset
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "maxTrades", Order = 14, GroupName = "Parameters")]
+        public int maxTrades
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "barsSinceLastTrade", Order = 15, GroupName = "Parameters")]
         public int barsSinceTrade
         { get; set; }
 
