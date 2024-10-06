@@ -188,7 +188,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         else if (TradeNum > maxTrades)
                         {
-                            Print($"Trade higher?");
+                            Print($"Over Trading");
                             DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 1) * limitOffset);
                         }
                     }
@@ -218,6 +218,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
 
             SessionPnl = DayPnl - TradesAll;
+            if ((TradeNum < 3) && (SessionPnl > (DailyProfitLimit * .42)))
+            {
+                Print($"PNL better than 40% after {TradeNum} trades");
+                LimitHit = true;
+            }
             if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
             {
                 Print($"Limit Hit {LimitHit} pnl= {SessionPnl} trades={TradeNum}");
