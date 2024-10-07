@@ -83,19 +83,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Daily Limits
                 UsingMicros = false;
+                PreventOvertrade = false;
                 DailyLossLimit = -1000.0;
                 DailyProfitLimit = 5000.0;
                 limitOffset = -100.0;
 
-                // Scale for micros
-                if (UsingMicros)
-                {
-                    DailyLossLimit = (DailyLossLimit * .10);
-                    DailyProfitLimit = (DailyProfitLimit * .10);
-                }
                 // Decay Profit Target
                 ProfitDecay = true;
-                ProfitReset = DailyProfitLimit;
+
+                // Session Settings
+                TradeAsia = false;
+                TradeLondon = false;
+                TradeNewYork = false; // this session treats AM and PM of NewYork as 1 session
+                TradeNewYorkAM = true; // can select this to trade only AM
+                TradeNewYorkPM = true; // can select this to trade only PM
 
                 // Bars Since Last Trade
                 barsSinceTrade = 0;
@@ -186,10 +187,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"{TradeNum} less {maxTrades} {DailyProfitLimit} ");
                             DailyProfitLimit = (DailyProfitLimit + limitOffset);
                         }
-                        else if (TradeNum > maxTrades)
+                        else if (TradeNum >= maxTrades)
                         {
                             Print($"Over Trading");
-                            DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 1) * limitOffset);
+                            if (HardLimit)
+                            {
+                                LimitHit = true;
+                            }
+                            else
+                            {
+                                DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 2) * limitOffset);
+                            }
+
                         }
                     }
                 }
@@ -216,11 +225,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Track Day and Session PNL
         private void TrackPNL()
         {
+            // Scale for micros
+            if (UsingMicros)
+            {
+                DailyLossLimit = (DailyLossLimit * .10);
+                DailyProfitLimit = (DailyProfitLimit * .10);
+            }
+
+            // Set the profit target value for resetting after decay
+            if ((ProfitDecay) && (ProfitReset == 0))
+            {
+                ProfitReset = DailyProfitLimit;
+            }
 
             // A check to avoid overtrading and to see if you had a great run-up, to stop for the session and wait for the next
-            if ((TradeNum <= 4) && (TradeNum > 0) && (SessionPnl > (DailyProfitLimit * .70)) || ((TradeNum == 1) && SessionPnl >= (DailyProfitLimit * .50)))
+            if ((PreventOvertrade) && ((TradeNum <= 4) && (TradeNum > 0) && (SessionPnl > (DailyProfitLimit * .70)) || ((TradeNum == 1) && SessionPnl >= (DailyProfitLimit * .50))))
             {
-                Print($"PNL Lockout better than 70% or 50% after {TradeNum} trades");
+                Print($"PNL Lockout better than 70% or 50% after {TradeNum} trade(s)!");
                 LimitHit = true;
             }
             if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
@@ -229,7 +250,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LimitHit = true;
             }
 
-            if (Times[0][0].TimeOfDay == new TimeSpan(18, 10, 0))
+            if (TradeAsia && Times[0][0].TimeOfDay == new TimeSpan(19, 02, 0))
             {
                 Print($"New Day & Asia Session");
                 LimitHit = false;
@@ -242,7 +263,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if (Times[0][0].TimeOfDay == new TimeSpan(01, 32, 0))
+            else if (TradeLondon && Times[0][0].TimeOfDay == new TimeSpan(01, 32, 0))
             {
 
                 Print($"London Session");
@@ -256,7 +277,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if (Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0))
+            else if (((TradeNewYorkAM || TradeNewYork) && Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0)))
             {
                 Print($"New York AM Session");
                 LimitHit = false;
@@ -269,7 +290,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if (Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0))
+            else if ((TradeNewYorkPM && Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0)) && !TradeNewYork)
             {
                 Print($"New York PM Session");
                 LimitHit = false;
@@ -563,80 +584,126 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Properties
+        // Each strategy might need some settings specific to that strat
         [NinjaScriptProperty]
-        [Display(Name = "UseiFVG", Order = 1, GroupName = "Parameters")]
+        [Category("Strategy Settings")]
+        [Display(Name = "UseiFVG", Order = 1, GroupName = "Strategy Settings")]
         public bool UseiFVG
         { get; set; }
 
+        // Typical parameters that are needed but not often changed
         [NinjaScriptProperty]
-        [Display(Name = "TradeDirection", Order = 2, GroupName = "Parameters")]
+        [Display(Name = "TradeDirection", Order = 1, GroupName = "Parameters")]
         public string TradeDirection
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeType", Order = 3, GroupName = "Parameters")]
+        [Display(Name = "TradeType", Order = 2, GroupName = "Parameters")]
         public string TradeType
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeLimitPrice", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "TradeLimitPrice", Order = 3, GroupName = "Parameters")]
         public double TradeLimitPrice
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeStopPrice", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "TradeStopPrice", Order = 4, GroupName = "Parameters")]
         public double TradeStopPrice
         { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "ATMname", Order = 6, GroupName = "Parameters")]
-        public string ATMname
-        { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "lookBackCount", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "lookBackCount", Order = 5, GroupName = "Parameters")]
         public int lookBackCount
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "ActivateATM", Order = 8, GroupName = "Parameters")]
+        [Display(Name = "barsSinceLastTrade", Order = 6, GroupName = "Parameters")]
+        public int barsSinceTrade
+        { get; set; }
+
+        // Trade Settings related to modifying trade behavior
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "ATMname", Order = 1, GroupName = "Trade Settings")]
+        public string ATMname
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "ActivateATM", Order = 2, GroupName = "Trade Settings")]
         public bool ActivateATM
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "DailyLossLimit", Order = 9, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "DailyLossLimit", Order = 3, GroupName = "Trade Settings")]
         public double DailyLossLimit
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "DailyProfitLimit", Order = 10, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "DailyProfitLimit", Order = 4, GroupName = "Trade Settings")]
         public double DailyProfitLimit
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "UsingMicros", Order = 11, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "UsingMicros", Order = 5, GroupName = "Trade Settings")]
         public bool UsingMicros
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "ProfitDecay", Order = 12, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "ProfitDecay", Order = 6, GroupName = "Trade Settings")]
         public bool ProfitDecay
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "limitOffset", Order = 13, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "limitOffset", Order = 7, GroupName = "Trade Settings")]
         public double limitOffset
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "maxTrades", Order = 14, GroupName = "Parameters")]
+        [Category("Trade Settings")]
+        [Display(Name = "maxTrades (increases profit decay)", Order = 8, GroupName = "Trade Settings")]
         public int maxTrades
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "barsSinceLastTrade", Order = 15, GroupName = "Parameters")]
-        public int barsSinceTrade
+        [Category("Trade Settings")]
+        [Display(Name = "Prevent Overtrading if > 50% of target in < 4 trades", Order = 9, GroupName = "Trade Settings")]
+        public bool PreventOvertrade
         { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "HardLimit (stop after maxTrades reached)", Order = 10, GroupName = "Trade Settings")]
+        public bool HardLimit
+        { get; set; }
+
+        // Parameters to select sessions
+        [NinjaScriptProperty]
+        [Display(Name = "Trade Asia Session", Order = 1, GroupName = "Session Settings")]
+        public bool TradeAsia { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade London Session", Order = 2, GroupName = "Session Settings")]
+        public bool TradeLondon { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York as 1 Session", Order = 3, GroupName = "Session Settings")]
+        public bool TradeNewYork { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York AM Session", Order = 4, GroupName = "Session Settings")]
+        public bool TradeNewYorkAM { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York PM Session", Order = 5, GroupName = "Session Settings")]
+        public bool TradeNewYorkPM { get; set; }
 
         #endregion
 
