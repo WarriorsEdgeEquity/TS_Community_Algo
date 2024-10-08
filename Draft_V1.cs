@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<FVG> fvgList = new List<FVG>();
 
         // variables for loss limits and profit limits
-        private Account InvAcct = Account.All.FirstOrDefault();
+        private double UnrealProfit = 0;
         private int TradeNum = 0;
         private double DayPnl = 0;
         private double SessionPnl = 0;
@@ -83,7 +83,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Daily Limits
                 UsingMicros = false;
-                PreventOvertrade = false;
+                PreventOvertrade = false;   // if 50% of profit reached in a couple trades
+                GetFlat = false;            // if LossLimit hit flatten and wait for next session
                 DailyLossLimit = -1000.0;
                 DailyProfitLimit = 5000.0;
                 limitOffset = -100.0;
@@ -123,6 +124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print($" OnAcctItem = {account} = {value}");
                 DayPnl = value;
+            }
+            else if (accountItem == Cbi.AccountItem.UnrealizedProfitLoss)
+            {
+                //Print($" UNREAL PROFIT ");
+                UnrealProfit = value;
             }
         }
 
@@ -244,6 +250,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print($"PNL Lockout - too much $$$$ after {TradeNum} trade(s)!");
                 LimitHit = true;
             }
+
+            // Should flatten all positions and orders and stop trading for the session
+            if ((GetFlat) && (!LimitHit) && ((SessionPnl + UnrealProfit) <= DailyLossLimit))
+            {
+                //Account.FlattenEverything();
+                //if (PositionAccount.MarketPosition == MarketPosition.Long)
+                //{
+                //    ExitLong("Exit All Long Positions");
+                //    Print("Closed all long positions.");
+                //}
+                //else if (PositionAccount.MarketPosition == MarketPosition.Short)
+                //{
+                //    ExitShort("Exit All Short Positions");
+                //    Print("Closed all short positions.");
+                //}
+                AtmStrategyClose(atmStrategyId);
+                Print($"Strategy closed {atmStrategyId}");
+                LimitHit = true;
+                Print($"Flattening ALL due to loss limit {SessionPnl + UnrealProfit}");
+            }
+
+            // Check session PNL against the Day PNL
             if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
             {
                 Print($"Limit Hit {LimitHit} pnl= {SessionPnl} trades={TradeNum}");
@@ -650,32 +678,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Category("Trade Settings")]
-        [Display(Name = "UsingMicros", Order = 5, GroupName = "Trade Settings")]
+        [Display(Name = "Flatten if LossLimit?", Order = 5, GroupName = "Trade Settings")]
+        public bool GetFlat
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "UsingMicros", Order = 6, GroupName = "Trade Settings")]
         public bool UsingMicros
         { get; set; }
 
         [NinjaScriptProperty]
         [Category("Trade Settings")]
-        [Display(Name = "ProfitDecay", Order = 6, GroupName = "Trade Settings")]
+        [Display(Name = "Profit Target Decay", Order = 7, GroupName = "Trade Settings")]
         public bool ProfitDecay
         { get; set; }
 
         [NinjaScriptProperty]
         [Category("Trade Settings")]
-        [Display(Name = "limitOffset", Order = 7, GroupName = "Trade Settings")]
+        [Display(Name = "Decay Amount", Order = 8, GroupName = "Trade Settings")]
         public double limitOffset
         { get; set; }
 
         [NinjaScriptProperty]
         [Category("Trade Settings")]
-        [Display(Name = "maxTrades (increases profit decay)", Order = 8, GroupName = "Trade Settings")]
+        [Display(Name = "maxTrades (increases profit decay)", Order = 9, GroupName = "Trade Settings")]
         public int maxTrades
-        { get; set; }
-
-        [NinjaScriptProperty]
-        [Category("Trade Settings")]
-        [Display(Name = "Prevent Overtrading if > 50% of target in < 4 trades", Order = 9, GroupName = "Trade Settings")]
-        public bool PreventOvertrade
         { get; set; }
 
         [NinjaScriptProperty]
@@ -683,6 +711,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "HardLimit (stop after maxTrades reached)", Order = 10, GroupName = "Trade Settings")]
         public bool HardLimit
         { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "Prevent Overtrading if > 50% of target in < 4 trades", Order = 11, GroupName = "Trade Settings")]
+        public bool PreventOvertrade
+        { get; set; }
+
 
         // Parameters to select sessions
         [NinjaScriptProperty]
