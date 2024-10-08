@@ -41,6 +41,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         // List to store all detected Fair Value Gaps (FVGs)
         private List<FVG> fvgList = new List<FVG>();
 
+        // variables for loss limits and profit limits
+        private double UnrealProfit = 0;
+        private int TradeNum = 0;
+        private double DayPnl = 0;
+        private double SessionPnl = 0;
+        private double TradesAll = 0;
+        private double ProfitReset = 0;
+        private bool LimitHit = false;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -72,17 +81,55 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradeLimitPrice = 0;
                 TradeStopPrice = 0;
 
+                // Daily Limits
+                UsingMicros = false;
+                PreventOvertrade = false;   // if 50% of profit reached in a couple trades
+                GetFlat = false;            // if LossLimit hit flatten and wait for next session
+                DailyLossLimit = -1000.0;
+                DailyProfitLimit = 5000.0;
+                limitOffset = -100.0;
+
+                // Decay Profit Target
+                ProfitDecay = true;
+
+                // Session Settings
+                TradeAsia = false;
+                TradeLondon = false;
+                TradeNewYork = false; // this session treats AM and PM of NewYork as 1 session
+                TradeNewYorkAM = true; // can select this to trade only AM
+                TradeNewYorkPM = true; // can select this to trade only PM
+
+                // Bars Since Last Trade
+                barsSinceTrade = 0;
+                maxTrades = 6;
+
+                // iFVG variables
+                lookBackCount = 3;
+
                 // your ATM template name needs to match this
                 ATMname = @"ATMstrategy";
+                // to use ATM strategies set to true
+                ActivateATM = true;
+
             }
             else if (State == State.Configure)
             {
+                Print($"Starting... {SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit}");
             }
         }
 
         protected override void OnAccountItemUpdate(Cbi.Account account, Cbi.AccountItem accountItem, double value)
         {
-
+            if (accountItem == Cbi.AccountItem.GrossRealizedProfitLoss)
+            {
+                Print($" OnAcctItem = {account} = {value}");
+                DayPnl = value;
+            }
+            else if (accountItem == Cbi.AccountItem.UnrealizedProfitLoss)
+            {
+                //Print($" UNREAL PROFIT ");
+                UnrealProfit = value;
+            }
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs connectionStatusUpdate)
@@ -129,33 +176,178 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DetectFVG();
             }
 
+            TrackPNL();
+
             // Make sure there is a few bars since last trade
-            if ((barNumber + 1) < CurrentBar && inTrade)
+            if ((barNumber + barsSinceTrade) < CurrentBar && inTrade)
             {
                 if (PositionAccount.MarketPosition == MarketPosition.Flat)
                 {
                     inTrade = false;
+
+                    // Profit Target Decay with the number of trades taken
+                    if (ProfitDecay)
+                    {
+                        if ((TradeNum <= maxTrades) && TradeNum > 0)
+                        {
+                            Print($"{TradeNum} less {maxTrades} {DailyProfitLimit} ");
+                            DailyProfitLimit = (DailyProfitLimit + limitOffset);
+                        }
+                        else if (TradeNum >= maxTrades)
+                        {
+                            Print($"Over Trading");
+                            if (HardLimit)
+                            {
+                                LimitHit = true;
+                            }
+                            else
+                            {
+                                DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 1) * limitOffset);
+                            }
+
+                        }
+                    }
                 }
             }
             // 2. Check for conditions to trigger a trade
-            if (TradeConditionMet()) // Placeholder method for your trade condition
+            if (TradeConditionMet() && !LimitHit) // Placeholder method for your trade condition
             {
                 EnterTrade(); // Method to handle trade entry
             }
 
             // 3. Implement exit strategies (e.g., stop loss, take profit)
-            //if (Position.MarketPosition == MarketPosition.Long)
-            //{
-            // Placeholder for logic to handle long positions (e.g., exit conditions)
-            //}
-            //else if (Position.MarketPosition == MarketPosition.Short)
-            //{
-            // Placeholder for logic to handle short positions (e.g., exit conditions)
-            //}
+            if (!ActivateATM && (Position.MarketPosition == MarketPosition.Long))
+            {
+                //Placeholder for logic to handle long positions (e.g., exit conditions)
+            }
+            else if (!ActivateATM && (Position.MarketPosition == MarketPosition.Short))
+            {
+                //Placeholder for logic to handle short positions (e.g., exit conditions)
+            }
         }
 
 
         #region Methods
+        // Track Day and Session PNL
+        private void TrackPNL()
+        {
+            // Scale for micros
+            if (UsingMicros)
+            {
+                DailyLossLimit = (DailyLossLimit * .10);
+                DailyProfitLimit = (DailyProfitLimit * .10);
+            }
+
+            // Set the profit target value for resetting after decay
+            if ((ProfitDecay) && (ProfitReset == 0))
+            {
+                ProfitReset = DailyProfitLimit;
+            }
+
+            // A check to avoid overtrading and to see if you had a great run-up, to stop for the session and wait for the next
+            if ((PreventOvertrade) && ((TradeNum <= 4) && (TradeNum > 0) && (SessionPnl > (DailyProfitLimit * .70)) || ((TradeNum == 1) && SessionPnl >= (DailyProfitLimit * .50))))
+            {
+                Print($"PNL Lockout - too much $$$$ after {TradeNum} trade(s)!");
+                LimitHit = true;
+            }
+
+            // Should flatten all positions and orders and stop trading for the session
+            if ((GetFlat) && (!LimitHit) && ((SessionPnl + UnrealProfit) <= DailyLossLimit))
+            {
+                //Account.FlattenEverything();
+                //if (PositionAccount.MarketPosition == MarketPosition.Long)
+                //{
+                //    ExitLong("Exit All Long Positions");
+                //    Print("Closed all long positions.");
+                //}
+                //else if (PositionAccount.MarketPosition == MarketPosition.Short)
+                //{
+                //    ExitShort("Exit All Short Positions");
+                //    Print("Closed all short positions.");
+                //}
+                AtmStrategyClose(atmStrategyId);
+                Print($"Strategy closed {atmStrategyId}");
+                LimitHit = true;
+                Print($"Flattening ALL due to loss limit {SessionPnl + UnrealProfit}");
+            }
+
+            // Check session PNL against the Day PNL
+            if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
+            {
+                Print($"Limit Hit {LimitHit} pnl= {SessionPnl} trades={TradeNum}");
+                LimitHit = true;
+            }
+
+            if (TradeAsia && Times[0][0].TimeOfDay == new TimeSpan(19, 02, 0))
+            {
+                Print($"New Day & Asia Session");
+                LimitHit = false;
+                DayPnl = 0;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            else if (TradeLondon && Times[0][0].TimeOfDay == new TimeSpan(01, 32, 0))
+            {
+
+                Print($"London Session");
+                LimitHit = false;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            else if (((TradeNewYorkAM || TradeNewYork) && Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0)))
+            {
+                Print($"New York AM Session");
+                LimitHit = false;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            else if ((TradeNewYorkPM && Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0)) && !TradeNewYork)
+            {
+                Print($"New York PM Session");
+                LimitHit = false;
+                TradesAll = DayPnl;
+                SessionPnl = 0;
+                TradeNum = 0;
+                BackBrush = Brushes.Green;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            else if (Times[0][0].TimeOfDay == new TimeSpan(15, 42, 0))
+            {
+                Print($"End Of Trading Day {DayPnl}");
+                LimitHit = true;
+                TradeNum = 0;
+                TradesAll = DayPnl;
+                BackBrush = Brushes.Red;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            SessionPnl = DayPnl - TradesAll;
+            Draw.TextFixed(this, @"pnl", Convert.ToString(SessionPnl), TextPosition.TopRight);
+            Draw.TextFixed(this, @"numTrades", Convert.ToString(TradeNum), TextPosition.BottomLeft);
+        }
+
         // Detect FVGs
         private void DetectFVG()
         {
@@ -164,7 +356,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
             // Check for Bullish Fair Value Gap
-            if ((High[2] < Low[0]) && (Open[1] < Close[1]))
+            if ((High[2] < Low[0]) && (Open[1] < Close[1]) && (Open[1] <= High[2]) && (Close[1] >= Low[0]))
             {
                 // Create and store a bullish FVG
                 FVG fvg = new FVG
@@ -180,7 +372,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Check for Bearish Fair Value Gap
-            else if ((Low[2] > High[0]) && (Close[1] < Open[1]))
+            else if ((Low[2] > High[0]) && (Close[1] < Open[1]) && (Open[1] >= Low[2]) && (Close[1] <= High[0]))
             {
                 // Create and store a bearish FVG
                 FVG fvg = new FVG
@@ -330,6 +522,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // You can change the stop price even when its being managed by the ATM strategy STOP19 is to prevent the STOP1 from being changed
                     // more logic needed here if you want to do fancy things with the stop loss while it is still being managed by ATM strategy
+
                     //if (GetAtmStrategyMarketPosition(atmStrategyId) != MarketPosition.Flat)
                     //	AtmStrategyChangeStopTarget(0, Low[0] - 3 * TickSize, "STOP19", atmStrategyId);
 
@@ -351,7 +544,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
 
             // Drop the oldest fair value gaps
-            while (fvgList.Count > 3)
+            while (fvgList.Count > lookBackCount)
             {
                 fvgList.RemoveAt(0);
             }
@@ -404,45 +597,149 @@ namespace NinjaTrader.NinjaScript.Strategies
                 isMarket = true;
             }
 
+            // use ATM for handling the target and stop
+            if (ActivateATM)
+            {
+                useATM(isLong, isMarket, TradeLimitPrice, TradeStopPrice);
+            }
             // flip the flag for in a trade
             inTrade = true;
+            TradeNum += 1;
             barNumber = CurrentBar;
+            Print($"{Times[0][0].TimeOfDay} pnl= {DayPnl} stop={DailyLossLimit} profit={DailyProfitLimit}");
 
-            // use ATM for handling the target and stop
-            useATM(isLong, isMarket, TradeLimitPrice, TradeStopPrice);
         }
         #endregion
 
         #region Properties
+        // Each strategy might need some settings specific to that strat
         [NinjaScriptProperty]
-        [Display(Name = "UseiFVG", Order = 1, GroupName = "Parameters")]
+        [Category("Strategy Settings")]
+        [Display(Name = "UseiFVG", Order = 1, GroupName = "Strategy Settings")]
         public bool UseiFVG
         { get; set; }
 
+        // Typical parameters that are needed but not often changed
         [NinjaScriptProperty]
-        [Display(Name = "TradeDirection", Order = 2, GroupName = "Parameters")]
+        [Display(Name = "TradeDirection", Order = 1, GroupName = "Parameters")]
         public string TradeDirection
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeType", Order = 3, GroupName = "Parameters")]
+        [Display(Name = "TradeType", Order = 2, GroupName = "Parameters")]
         public string TradeType
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeLimitPrice", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "TradeLimitPrice", Order = 3, GroupName = "Parameters")]
         public double TradeLimitPrice
         { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TradeStopPrice", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "TradeStopPrice", Order = 4, GroupName = "Parameters")]
         public double TradeStopPrice
         { get; set; }
 
+
         [NinjaScriptProperty]
-        [Display(Name = "ATMname", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "lookBackCount", Order = 5, GroupName = "Parameters")]
+        public int lookBackCount
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "barsSinceLastTrade", Order = 6, GroupName = "Parameters")]
+        public int barsSinceTrade
+        { get; set; }
+
+        // Trade Settings related to modifying trade behavior
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "ATMname", Order = 1, GroupName = "Trade Settings")]
         public string ATMname
         { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "ActivateATM", Order = 2, GroupName = "Trade Settings")]
+        public bool ActivateATM
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "DailyLossLimit", Order = 3, GroupName = "Trade Settings")]
+        public double DailyLossLimit
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "DailyProfitLimit", Order = 4, GroupName = "Trade Settings")]
+        public double DailyProfitLimit
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "Flatten if LossLimit?", Order = 5, GroupName = "Trade Settings")]
+        public bool GetFlat
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "UsingMicros", Order = 6, GroupName = "Trade Settings")]
+        public bool UsingMicros
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "Profit Target Decay", Order = 7, GroupName = "Trade Settings")]
+        public bool ProfitDecay
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "Decay Amount", Order = 8, GroupName = "Trade Settings")]
+        public double limitOffset
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "maxTrades (increases profit decay)", Order = 9, GroupName = "Trade Settings")]
+        public int maxTrades
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "HardLimit (stop after maxTrades reached)", Order = 10, GroupName = "Trade Settings")]
+        public bool HardLimit
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Trade Settings")]
+        [Display(Name = "Prevent Overtrading if > 50% of target in < 4 trades", Order = 11, GroupName = "Trade Settings")]
+        public bool PreventOvertrade
+        { get; set; }
+
+
+        // Parameters to select sessions
+        [NinjaScriptProperty]
+        [Display(Name = "Trade Asia Session", Order = 1, GroupName = "Session Settings")]
+        public bool TradeAsia { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade London Session", Order = 2, GroupName = "Session Settings")]
+        public bool TradeLondon { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York as 1 Session", Order = 3, GroupName = "Session Settings")]
+        public bool TradeNewYork { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York AM Session", Order = 4, GroupName = "Session Settings")]
+        public bool TradeNewYorkAM { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York PM Session", Order = 5, GroupName = "Session Settings")]
+        public bool TradeNewYorkPM { get; set; }
+
         #endregion
 
     }
