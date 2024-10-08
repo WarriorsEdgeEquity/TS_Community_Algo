@@ -121,12 +121,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Configure)
             {
                 Print($"Starting... {SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit}");
-
-                if (UseRSI)
-                {
-                    rsi = RSI(RsiPeriod, 3);  // Set up the RSI with user-defined period
-                    AddChartIndicator(rsi);    // Optional: display RSI on the chart
-                }
             }
         }
 
@@ -188,10 +182,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DetectFVG();
             }
 
-            if (UseRSI && rsi != null)
-            {
-                rsiValue = rsi[0];  // Get the current RSI value
-            }
+	    // Check for RSI logic if enabled
+	    if (UseRSI)
+	    {
+	    	// Initialize RSI if not already done
+	    	if (rsi == null)
+	    	{
+		    rsi = RSI(RsiPeriod, 3);  // Initialize RSI with user-specified period
+		    AddChartIndicator(rsi);    // Optionally display the RSI on the chart
+	    	}
+		
+	     	rsiValue = rsi[0];  // Get the RSI value for the current bar
+	    }
 
             TrackPNL();
 
@@ -644,20 +646,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Properties
         // Each strategy might need some settings specific to that strat
-		[NinjaScriptProperty]
-        [Category("RSI Settings")]
-        [Display(Name = "Use RSI in Strategy", Order = 1, GroupName = "RSI Settings")]
-        public bool UseRSI { get; set; }  // User option to enable or disable RSI
-
-        [NinjaScriptProperty]
-        [Display(Name = "RSI Period", Order = 2, GroupName = "RSI Settings")]
-        public int RsiPeriod { get; set; }  // RSI period input
-
         [NinjaScriptProperty]
         [Category("Strategy Settings")]
         [Display(Name = "UseiFVG", Order = 1, GroupName = "Strategy Settings")]
         public bool UseiFVG
         { get; set; }
+		
+	[NinjaScriptProperty]
+	[Category("Strategy Settings")]
+	[Display(Name = "Use RSI in Strategy", Order = 2, GroupName = "Strategy Settings")]
+	public bool UseRSI { get; set; }
+		
+	[NinjaScriptProperty]
+	[Category("Strategy Settings")]
+	[Range(1, int.MaxValue)]
+	[Display(Name = "RSI Period", Order = 3, GroupName = "Strategy Settings")]
+	public int RsiPeriod { get; set; }
 
         // Typical parameters that are needed but not often changed
         [NinjaScriptProperty]
