@@ -34,6 +34,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string atmStrategyOrderId;
         private bool isAtmStrategyCreated = false;
 
+	 // RSI variables
+        private RSI rsi;
+        private double rsiValue;
+
         // variables for making sure only 1 order is submitted
         private bool inTrade = false;
         private int barNumber = -1;
