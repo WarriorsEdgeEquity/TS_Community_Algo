@@ -196,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
                             else
                             {
-                                DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 2) * limitOffset);
+                                DailyProfitLimit = DailyProfitLimit + (((TradeNum - maxTrades) + 1) * limitOffset);
                             }
 
                         }
@@ -241,7 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // A check to avoid overtrading and to see if you had a great run-up, to stop for the session and wait for the next
             if ((PreventOvertrade) && ((TradeNum <= 4) && (TradeNum > 0) && (SessionPnl > (DailyProfitLimit * .70)) || ((TradeNum == 1) && SessionPnl >= (DailyProfitLimit * .50))))
             {
-                Print($"PNL Lockout better than 70% or 50% after {TradeNum} trade(s)!");
+                Print($"PNL Lockout - too much $$$$ after {TradeNum} trade(s)!");
                 LimitHit = true;
             }
             if ((SessionPnl >= DailyProfitLimit) || (SessionPnl <= DailyLossLimit))
