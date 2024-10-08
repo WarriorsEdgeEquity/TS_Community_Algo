@@ -72,9 +72,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopTargetHandling = StopTargetHandling.PerEntryExecution;
                 BarsRequiredToTrade = 20;
 
-                // turn on off inverted fvgs
+                // turn on off inverted fvgs / RSI
                 UseiFVG = true;
-
+                UseRSI = false;  // Add user input for RSI toggle
+                RsiPeriod = 14;  // Default RSI period
+                
                 // variables for setting trade direction
                 TradeDirection = @"long";       // short
                 TradeType = @"market";  // limit
@@ -115,6 +117,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Configure)
             {
                 Print($"Starting... {SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit}");
+
+                if (UseRSI)
+                {
+                    rsi = RSI(RsiPeriod, 3);  // Set up the RSI with user-defined period
+                    AddChartIndicator(rsi);    // Optional: display RSI on the chart
+                }
             }
         }
 
@@ -174,6 +182,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (UseiFVG)
             {
                 DetectFVG();
+            }
+
+            if (UseRSI && rsi != null)
+            {
+                rsiValue = rsi[0];  // Get the current RSI value
             }
 
             TrackPNL();
@@ -408,17 +421,31 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool TradeConditionMet()
         {
             // Add logic to check for trade conditions (e.g., engulfing pattern, price breakout)
-            if (!inTrade)
+			if (!inTrade)
             {
-                if ((UseiFVG))
+                if (UseiFVG)
                 {
                     if (CheckForFVGClosure())
                     {
-                        return true;
+                        if (UseRSI)
+                        {
+                            // Add RSI condition (e.g., RSI < 30 for long trades, RSI > 70 for short trades)
+                            if (TradeDirection == "long" && rsiValue < 30)
+                            {
+                                return true;
+                            }
+                            if (TradeDirection == "short" && rsiValue > 70)
+                            {
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            return true;
+                        }
                     }
                 }
             }
-            // Return true if conditions met, otherwise false
             return false;
         }
 
@@ -613,6 +640,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Properties
         // Each strategy might need some settings specific to that strat
+		[NinjaScriptProperty]
+        [Category("RSI Settings")]
+        [Display(Name = "Use RSI in Strategy", Order = 1, GroupName = "RSI Settings")]
+        public bool UseRSI { get; set; }  // User option to enable or disable RSI
+
+        [NinjaScriptProperty]
+        [Display(Name = "RSI Period", Order = 2, GroupName = "RSI Settings")]
+        public int RsiPeriod { get; set; }  // RSI period input
+
         [NinjaScriptProperty]
         [Category("Strategy Settings")]
         [Display(Name = "UseiFVG", Order = 1, GroupName = "Strategy Settings")]
