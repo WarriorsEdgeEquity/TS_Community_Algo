@@ -60,7 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Session Times
         // Define trading session times in Eastern Time
-        private TimeSpan asiaSessionStart = new TimeSpan(18, 01, 0); // 6:00 PM
+        private TimeSpan asiaSessionStart = new TimeSpan(18, 02, 0); // 6:00 PM
         private TimeSpan asiaSessionEnd = new TimeSpan(1, 0, 0);    // 1:00 AM
         private TimeSpan londonSessionStart = new TimeSpan(3, 0, 0); // 3:00 AM
         private TimeSpan londonSessionEnd = new TimeSpan(11, 0, 0);  // 11:00 AM
@@ -218,11 +218,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             TrackPNL();
 
             // Make sure there is a few bars since last trade
-            if (((barNumber + barsSinceTrade) < CurrentBar) && inTrade)
+            if (inTrade)
             {
                 if (PositionAccount.MarketPosition == MarketPosition.Flat)
                 {
                     inTrade = false;
+                    barNumber = CurrentBar;
 
                     // Profit Target Decay with the number of trades taken
                     if (ProfitDecay)
@@ -249,7 +250,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             // 2. Check for conditions to trigger a trade
-            if (TradeConditionMet() && !LimitHit && PowerOn) // Placeholder method for your trade condition
+            if (TradeConditionMet() && !LimitHit && PowerOn && ((barNumber + barsSinceTrade) <= CurrentBar)) // Placeholder method for your trade condition
             {
                 EnterTrade(); // Method to handle trade entry
             }
@@ -401,7 +402,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             // turn power off at end of each session
-            else if ((Times[0][0].TimeOfDay == asiaSessionEnd) || (Times[0][0].TimeOfDay == londonSessionEnd) || (Times[0][0].TimeOfDay == newYorkAMSessionEnd))
+            else if ((TradeAsia && Times[0][0].TimeOfDay == asiaSessionEnd) || (TradeLondon && Times[0][0].TimeOfDay == londonSessionEnd) || (TradeNewYorkAM && Times[0][0].TimeOfDay == newYorkAMSessionEnd))
             {
                 Print($"End Of Trading Day {DayPnl}");
                 //LimitHit = true;
@@ -690,7 +691,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // flip the flag for in a trade
             inTrade = true;
             TradeNum += 1;
-            barNumber = CurrentBar;
+            //barNumber = CurrentBar;
             Print($"{Times[0][0].TimeOfDay} pnl= {DayPnl} stop={DailyLossLimit} profit={DailyProfitLimit}");
 
         }
