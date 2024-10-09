@@ -402,7 +402,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             // turn power off at end of each session
-            else if ((Times[0][0].TimeOfDay == asiaSessionEnd) || (Times[0][0].TimeOfDay == londonSessionEnd) || (Times[0][0].TimeOfDay == newYorkAMSessionEnd))
+            else if ((TradeAsia && Times[0][0].TimeOfDay == asiaSessionEnd) || (TradeLondon && Times[0][0].TimeOfDay == londonSessionEnd) || (TradeNewYorkAM && Times[0][0].TimeOfDay == newYorkAMSessionEnd))
             {
                 Print($"End Of Trading Day {DayPnl}");
                 //LimitHit = true;
