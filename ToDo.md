@@ -5,40 +5,40 @@ This file tracks the upcoming features, improvements, and bug fixes for the TopS
 ## 📋 Current Tasks
 
 ### 1. **Feature Development**
-- [ ] Implement [Feature Name] for [Indicator/Strategy].
+- [ ] Implement [Feature Name] for Strategy.
 - [ ] Add support for [Market Type] (e.g., Futures, Options).
-- [ ] Integrate new [Bot Signal / API] functionality for Discord automation.
+- [ ] XXX.
 
 ### 2. **Bug Fixes**
-- [ ] Fix issue with [Feature/Indicator Name] causing [Issue Description].
-- [ ] Resolve trade execution discrepancy in [NinjaTrader / ThinkOrSwim].
-- [ ] Address incorrect time-frame readings in bot OCR.
+- [ ] Fix issue with iFVG trading on a FVG breach rather than retest.
+- [ ] XXX
+- [ ] XXX
 
 ### 3. **Performance Improvements**
 - [ ] Optimize backtesting performance for large datasets.
-- [ ] Improve Tick Data processing speed in [NinjaTrader/TradingView].
+- [ ] Improve Tick Data processing speed in [NinjaTrader]
 - [ ] Refactor code for better memory management during live trade execution.
 
 ### 4. **Documentation**
 - [ ] Update user guide for [New Feature / Strategy].
-- [ ] Add FAQ section to website and Discord.
-- [ ] Document RSI conditional logic and usage instructions for new users.
+- [ ] Pin FAQs and Updates to Discord Channel
+- [ ] Document RSI conditional logic and usage data in comparison to no RSI.
 
 ## 🔄 Backlog
 
 ### 1. **Feature Requests**
-- [ ] Add a setting for user-defined trade entry/exit conditions.
-- [ ] Explore integration with [ThinkOrSwim] for automated stock options trading.
+- [ ] Add a setting for multi-timeframe analysis for iFVGs to start.
+- [ ] Explore integration with other conditionals (SMA, Breakers, etc.)
   
 ### 2. **Planned Updates**
-- [ ] Release new iFVG strategy.
-- [ ] Develop tutorial content for beginners using DR/iDR indicator.
+- [ ] Revise iFVG trading procedures
+- [ ] Develop tutorial content for beginners using this strategy
 
 ## ⏳ Completed Tasks
 
-- [x] Launch Discord community for Warriors Edge Equity.
+- [x] Test ATM Strategy Functionality
 - [x] Resolve RSI conditional logic issues in NinjaTrader strategy.
-- [x] Publish DR/iDR indicator to public repository.
+- [x] XXX
 
 ---
 
