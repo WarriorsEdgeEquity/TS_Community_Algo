@@ -60,7 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Session Times
         // Define trading session times in Eastern Time
-        private TimeSpan asiaSessionStart = new TimeSpan(18, 0, 0); // 6:00 PM
+        private TimeSpan asiaSessionStart = new TimeSpan(18, 01, 0); // 6:00 PM
         private TimeSpan asiaSessionEnd = new TimeSpan(1, 0, 0);    // 1:00 AM
         private TimeSpan londonSessionStart = new TimeSpan(3, 0, 0); // 3:00 AM
         private TimeSpan londonSessionEnd = new TimeSpan(11, 0, 0);  // 11:00 AM
