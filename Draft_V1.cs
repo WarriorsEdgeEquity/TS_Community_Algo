@@ -34,7 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string atmStrategyOrderId;
         private bool isAtmStrategyCreated = false;
 
-	 // RSI variables
+        // RSI variables
         private RSI rsi;
         private double rsiValue;
 
@@ -53,6 +53,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double TradesAll = 0;
         private double ProfitReset = 0;
         private bool LimitHit = false;
+        private bool LimitsAdjusted = false;
+
+        // Power Switch for the Algo
+        private bool PowerOn = false;
+
+        // Session Times
+        // Define trading session times in Eastern Time
+        private TimeSpan asiaSessionStart = new TimeSpan(18, 01, 0); // 6:00 PM
+        private TimeSpan asiaSessionEnd = new TimeSpan(1, 0, 0);    // 1:00 AM
+        private TimeSpan londonSessionStart = new TimeSpan(3, 0, 0); // 3:00 AM
+        private TimeSpan londonSessionEnd = new TimeSpan(11, 0, 0);  // 11:00 AM
+        private TimeSpan newYorkAMSessionStart = new TimeSpan(9, 30, 0); // 9:30 AM
+        private TimeSpan newYorkAMSessionEnd = new TimeSpan(12, 0, 0);   // 12:00 PM
+        private TimeSpan newYorkPMSessionStart = new TimeSpan(13, 0, 0); // 1:00 PM
+        private TimeSpan newYorkPMSessionEnd = new TimeSpan(16, 0, 0);   // 4:00 PM
 
         protected override void OnStateChange()
         {
@@ -80,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 UseiFVG = true;
                 UseRSI = false;  // Add user input for RSI toggle
                 RsiPeriod = 14;  // Default RSI period
-                
+
                 // variables for setting trade direction
                 TradeDirection = @"long";       // short
                 TradeType = @"market";  // limit
@@ -104,6 +119,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradeNewYork = false; // this session treats AM and PM of NewYork as 1 session
                 TradeNewYorkAM = true; // can select this to trade only AM
                 TradeNewYorkPM = true; // can select this to trade only PM
+                TradeNewYorkLunch = true; // can select this to trade only Lunch
 
                 // Bars Since Last Trade
                 barsSinceTrade = 0;
@@ -182,23 +198,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DetectFVG();
             }
 
-	    // Check for RSI logic if enabled
-	    if (UseRSI)
-	    {
-	    	// Initialize RSI if not already done
-	    	if (rsi == null)
-	    	{
-		    rsi = RSI(RsiPeriod, 3);  // Initialize RSI with user-specified period
-		    AddChartIndicator(rsi);    // Optionally display the RSI on the chart
-	    	}
-		
-	     	rsiValue = rsi[0];  // Get the RSI value for the current bar
-	    }
+            // Check for RSI logic if enabled
+            if (UseRSI)
+            {
+                // Initialize RSI if not already done
+                if (rsi == null)
+                {
+                    rsi = RSI(RsiPeriod, 3);  // Initialize RSI with user-specified period
+                    AddChartIndicator(rsi);    // Optionally display the RSI on the chart
+                }
 
+                rsiValue = rsi[0];  // Get the RSI value for the current bar
+            }
+
+            // Make sure we are in a trading session
+            UpdateSessionFlags();
+
+            // For risk management
             TrackPNL();
 
             // Make sure there is a few bars since last trade
-            if ((barNumber + barsSinceTrade) < CurrentBar && inTrade)
+            if (((barNumber + barsSinceTrade) < CurrentBar) && inTrade)
             {
                 if (PositionAccount.MarketPosition == MarketPosition.Flat)
                 {
@@ -229,7 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             // 2. Check for conditions to trigger a trade
-            if (TradeConditionMet() && !LimitHit) // Placeholder method for your trade condition
+            if (TradeConditionMet() && !LimitHit && PowerOn) // Placeholder method for your trade condition
             {
                 EnterTrade(); // Method to handle trade entry
             }
@@ -247,14 +267,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         #region Methods
+
+        // Confirm when script is active that it is only trading the selected sessions
+        private void UpdateSessionFlags()
+        {
+            DateTime currentTime = Times[0][0]; // Get the current bar time
+
+            // Asia Session
+            if ((currentTime.TimeOfDay >= asiaSessionStart || currentTime.TimeOfDay < asiaSessionEnd) && TradeAsia)
+                PowerOn = true;
+
+            // London Session
+            if ((currentTime.TimeOfDay >= londonSessionStart && currentTime.TimeOfDay < londonSessionEnd) && TradeLondon)
+                PowerOn = true;
+
+            // New York AM Session
+            if ((currentTime.TimeOfDay >= newYorkAMSessionStart && currentTime.TimeOfDay < newYorkAMSessionEnd) && TradeNewYorkAM)
+                PowerOn = true;
+
+            // New York PM Session
+            if ((currentTime.TimeOfDay >= newYorkPMSessionStart && currentTime.TimeOfDay < newYorkPMSessionEnd) && TradeNewYorkPM)
+                PowerOn = true;
+
+            // New York Lunch Break
+            if ((currentTime.TimeOfDay >= newYorkAMSessionEnd && currentTime.TimeOfDay < newYorkPMSessionStart) && TradeNewYorkLunch)
+                PowerOn = true;
+        }
+
         // Track Day and Session PNL
         private void TrackPNL()
         {
             // Scale for micros
-            if (UsingMicros)
+            if (UsingMicros && !LimitsAdjusted)
             {
-                DailyLossLimit = (DailyLossLimit * .10);
-                DailyProfitLimit = (DailyProfitLimit * .10);
+                DailyLossLimit = (DailyLossLimit / 10);
+                DailyProfitLimit = (DailyProfitLimit / 10);
+                LimitsAdjusted = true;
             }
 
             // Set the profit target value for resetting after decay
@@ -273,21 +321,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Should flatten all positions and orders and stop trading for the session
             if ((GetFlat) && (!LimitHit) && ((SessionPnl + UnrealProfit) <= DailyLossLimit))
             {
-                //Account.FlattenEverything();
-                //if (PositionAccount.MarketPosition == MarketPosition.Long)
-                //{
-                //    ExitLong("Exit All Long Positions");
-                //    Print("Closed all long positions.");
-                //}
-                //else if (PositionAccount.MarketPosition == MarketPosition.Short)
-                //{
-                //    ExitShort("Exit All Short Positions");
-                //    Print("Closed all short positions.");
-                //}
                 AtmStrategyClose(atmStrategyId);
                 Print($"Strategy closed {atmStrategyId}");
                 LimitHit = true;
-                Print($"Flattening ALL due to loss limit {SessionPnl + UnrealProfit}");
+                Print($"Flattening ALL due to loss: {SessionPnl + UnrealProfit}");
             }
 
             // Check session PNL against the Day PNL
@@ -297,7 +334,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 LimitHit = true;
             }
 
-            if (TradeAsia && Times[0][0].TimeOfDay == new TimeSpan(19, 02, 0))
+            if (TradeAsia && Times[0][0].TimeOfDay == asiaSessionStart)
             {
                 Print($"New Day & Asia Session");
                 LimitHit = false;
@@ -310,7 +347,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if (TradeLondon && Times[0][0].TimeOfDay == new TimeSpan(01, 32, 0))
+            else if (TradeLondon && Times[0][0].TimeOfDay == londonSessionStart)
             {
 
                 Print($"London Session");
@@ -324,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if (((TradeNewYorkAM || TradeNewYork) && Times[0][0].TimeOfDay == new TimeSpan(09, 32, 0)))
+            else if (((TradeNewYorkAM || TradeNewYork) && Times[0][0].TimeOfDay == newYorkAMSessionStart))
             {
                 Print($"New York AM Session");
                 LimitHit = false;
@@ -337,7 +374,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DailyProfitLimit = ProfitReset;
                 }
             }
-            else if ((TradeNewYorkPM && Times[0][0].TimeOfDay == new TimeSpan(13, 28, 0)) && !TradeNewYork)
+            else if ((TradeNewYorkPM && Times[0][0].TimeOfDay == newYorkPMSessionStart) && !TradeNewYork)
             {
                 Print($"New York PM Session");
                 LimitHit = false;
@@ -354,6 +391,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print($"End Of Trading Day {DayPnl}");
                 LimitHit = true;
+                PowerOn = false;
+                TradeNum = 0;
+                TradesAll = DayPnl;
+                BackBrush = Brushes.Red;
+                if (ProfitDecay)
+                {
+                    DailyProfitLimit = ProfitReset;
+                }
+            }
+            // turn power off at end of each session
+            else if ((Times[0][0].TimeOfDay == asiaSessionEnd) || (Times[0][0].TimeOfDay == londonSessionEnd) || (Times[0][0].TimeOfDay == newYorkAMSessionEnd))
+            {
+                Print($"End Of Trading Day {DayPnl}");
+                //LimitHit = true;
+                PowerOn = false;
                 TradeNum = 0;
                 TradesAll = DayPnl;
                 BackBrush = Brushes.Red;
@@ -427,7 +479,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool TradeConditionMet()
         {
             // Add logic to check for trade conditions (e.g., engulfing pattern, price breakout)
-			if (!inTrade)
+            if (!inTrade)
             {
                 if (UseiFVG)
                 {
@@ -651,17 +703,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "UseiFVG", Order = 1, GroupName = "Strategy Settings")]
         public bool UseiFVG
         { get; set; }
-		
-	[NinjaScriptProperty]
-	[Category("Strategy Settings")]
-	[Display(Name = "Use RSI in Strategy", Order = 2, GroupName = "Strategy Settings")]
-	public bool UseRSI { get; set; }
-		
-	[NinjaScriptProperty]
-	[Category("Strategy Settings")]
-	[Range(1, int.MaxValue)]
-	[Display(Name = "RSI Period", Order = 3, GroupName = "Strategy Settings")]
-	public int RsiPeriod { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Strategy Settings")]
+        [Display(Name = "Use RSI in Strategy", Order = 2, GroupName = "Strategy Settings")]
+        public bool UseRSI { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Strategy Settings")]
+        [Range(1, int.MaxValue)]
+        [Display(Name = "RSI Period", Order = 3, GroupName = "Strategy Settings")]
+        public int RsiPeriod { get; set; }
 
         // Typical parameters that are needed but not often changed
         [NinjaScriptProperty]
@@ -783,6 +835,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Trade New York PM Session", Order = 5, GroupName = "Session Settings")]
         public bool TradeNewYorkPM { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade New York Lunch Break", Order = 6, GroupName = "Session Settings")]
+        public bool TradeNewYorkLunch { get; set; }
 
         #endregion
 
