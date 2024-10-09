@@ -137,6 +137,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Configure)
             {
                 Print($"Starting... {SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit}");
+                if (UseRSI)
+                {
+                    rsi = RSI(RsiPeriod, 3);  // Set up the RSI with user-defined period
+                    AddChartIndicator(rsi);    // Add the RSI indicator to the chart
+                }  
             }
         }
 
@@ -198,16 +203,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DetectFVG();
             }
 
-            // Check for RSI logic if enabled
-            if (UseRSI)
+            // Ensure the RSI is enabled and initialized
+            if (UseRSI && rsi != null)
             {
-                // Initialize RSI if not already done
-                if (rsi == null)
-                {
-                    rsi = RSI(RsiPeriod, 3);  // Initialize RSI with user-specified period
-                    AddChartIndicator(rsi);    // Optionally display the RSI on the chart
-                }
-
                 rsiValue = rsi[0];  // Get the RSI value for the current bar
             }
 
