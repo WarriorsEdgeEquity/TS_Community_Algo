@@ -718,7 +718,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Category("Strategy Settings")]
-        [Display(Name = "Gap Size" Order = 2, GroupName = "Strategy Settings")]
+        [Display(Name = "Gap Size", Order = 2, GroupName = "Strategy Settings")]
         public double bigTickEnergy
         { get; set; }
 
