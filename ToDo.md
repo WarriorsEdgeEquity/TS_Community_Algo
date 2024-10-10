@@ -28,7 +28,8 @@ This file tracks the upcoming features, improvements, and bug fixes for the TopS
 
 ### 1. **Feature Requests**
 - [ ] Add a setting for multi-timeframe analysis for iFVGs to start.
-- [ ] Explore integration with other conditionals (SMA, Breakers, etc.)
+- [ ] Explore integration with other conditionals (FVG, Breaker, etc.)
+- [ ] Add LMT orders for entry on iFVG.
   
 ### 2. **Planned Updates**
 - [ ] Revise iFVG trading procedures
