@@ -44,6 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // List to store all detected Fair Value Gaps (FVGs)
         private List<FVG> fvgList = new List<FVG>();
+        private double gapSize = 0;
 
         // variables for loss limits and profit limits
         private double UnrealProfit = 0;
@@ -127,6 +128,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // iFVG variables
                 lookBackCount = 3;
+                bigTickEnergy = 0; // the lower the number the smaller the tick
 
                 // your ATM template name needs to match this
                 ATMname = @"ATMstrategy";
@@ -141,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     rsi = RSI(RsiPeriod, 3);  // Set up the RSI with user-defined period
                     AddChartIndicator(rsi);    // Add the RSI indicator to the chart
-                }  
+                }
             }
         }
 
@@ -425,36 +427,47 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < 3)
                 return;
 
+            gapSize = 0;
             // Check for Bullish Fair Value Gap
             if ((High[2] < Low[0]) && (Open[1] < Close[1]) && (Open[1] <= High[2]) && (Close[1] >= Low[0]))
             {
-                // Create and store a bullish FVG
-                FVG fvg = new FVG
+                // Check for gap size
+                gapSize = (Low[0] - High[2]);
+                if (gapSize >= bigTickEnergy)
                 {
-                    Type = FVGType.Bullish,
-                    StartBar = CurrentBar,
-                    StartPrice = High[2],
-                    EndPrice = Low[0]
-                };
-                fvgList.Add(fvg);
+                    // Create and store a bullish FVG
+                    FVG fvg = new FVG
+                    {
+                        Type = FVGType.Bullish,
+                        StartBar = CurrentBar,
+                        StartPrice = High[2],
+                        EndPrice = Low[0]
+                    };
+                    fvgList.Add(fvg);
 
-                Print($"Bullish FVG detected from {High[2]} to {Low[0]} at bar {CurrentBar}");
+                    Print($"Bullish FVG detected from {High[2]} to {Low[0]} at bar {CurrentBar}");
+                }
             }
 
             // Check for Bearish Fair Value Gap
             else if ((Low[2] > High[0]) && (Close[1] < Open[1]) && (Open[1] >= Low[2]) && (Close[1] <= High[0]))
             {
-                // Create and store a bearish FVG
-                FVG fvg = new FVG
+                // Check for gap size
+                gapSize = (Low[2] - High[0]);
+                if (gapSize >= bigTickEnergy)
                 {
-                    Type = FVGType.Bearish,
-                    StartBar = CurrentBar,
-                    StartPrice = Low[2],
-                    EndPrice = High[0]
-                };
-                fvgList.Add(fvg);
+                    // Create and store a bearish FVG
+                    FVG fvg = new FVG
+                    {
+                        Type = FVGType.Bearish,
+                        StartBar = CurrentBar,
+                        StartPrice = Low[2],
+                        EndPrice = High[0]
+                    };
+                    fvgList.Add(fvg);
 
-                Print($"Bearish FVG detected from {Low[2]} to {High[0]} at bar {CurrentBar}");
+                    Print($"Bearish FVG detected from {Low[2]} to {High[0]} at bar {CurrentBar}");
+                }
             }
         }
         // Example class to represent a Fair Value Gap (FVG)
@@ -705,13 +718,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Category("Strategy Settings")]
-        [Display(Name = "Use RSI in Strategy", Order = 2, GroupName = "Strategy Settings")]
+        [Display(Name = "Gap Size" Order = 2, GroupName = "Strategy Settings")]
+        public double bigTickEnergy
+        { get; set; }
+
+        [NinjaScriptProperty]
+        [Category("Strategy Settings")]
+        [Display(Name = "Use RSI in Strategy", Order = 3, GroupName = "Strategy Settings")]
         public bool UseRSI { get; set; }
 
         [NinjaScriptProperty]
         [Category("Strategy Settings")]
         [Range(1, int.MaxValue)]
-        [Display(Name = "RSI Period", Order = 3, GroupName = "Strategy Settings")]
+        [Display(Name = "RSI Period", Order = 4, GroupName = "Strategy Settings")]
         public int RsiPeriod { get; set; }
 
         // Typical parameters that are needed but not often changed
