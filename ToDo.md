@@ -7,7 +7,23 @@ This file tracks the upcoming features, improvements, and bug fixes for the TopS
 ### 1. **Feature Development**
 - [ ] Implement [Feature Name] for Strategy.
 - [ ] Add support for [Market Type] (e.g., Futures, Options).
+- [ ] Failed Breakouts? ICT Killzone? Market Shifts/Breaks?
+- [ ] ICT Breakers.
+- [ ] Remove requirement for Chart Trader template to be selected.
+- [ ] Add higher time-frame confluences.
+- [ ] Pause script button?
+- [ ] Move ATM Stops based on market moves / function is already built just need conditions.
+- [ ] EMA indicator based conditions.
+- [ ] Retest option to iFVG condition.
+- [ ] BPR or Unicorn conditions.
+- [ ] Option to clear FVG list at start of new session.
+- [ ] Premarket session option for 7am-9:30am.
+- [ ] Invalidation condition.
+- [ ] Cummalitve delta condition (onPriceChange).
 - [ ] XXX.
+- [ ] XXX.
+- [ ] XXX.
+
 
 ### 2. **Bug Fixes**
 - [ ] Fix issue with iFVG trading on a FVG breach rather than retest.
@@ -18,6 +34,8 @@ This file tracks the upcoming features, improvements, and bug fixes for the TopS
 - [ ] Optimize backtesting performance for large datasets.
 - [ ] Improve Tick Data processing speed in [NinjaTrader]
 - [ ] Refactor code for better memory management during live trade execution.
+- [ ] Evaluate the use of onEachTick.
+- [ ] XXX.
 
 ### 4. **Documentation**
 - [ ] Update user guide for [New Feature / Strategy].
